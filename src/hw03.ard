@@ -8,46 +8,89 @@
   | suc x, 0 => false
   | suc x, suc y => x < y
 
-\func lookup => {?}
+\func lookup {A : \Type} (xs : List A) (n : Nat) (p : T (n < length xs)) : A
+  | nil, 0, ()
+  | cons a xs, 0, p => a
+  | cons a xs, suc n, p => lookup xs n p
 
 -- 2. Реализуйте аналоги функции replicate для vec и Vec (эта функция создает список заданной длины, состоящий из повторений данного элемента).
+\func replicate1 {A : \Type} (a : A) (n : Nat) : vec A n \elim n
+  | 0 => ()
+  | suc n => (a, replicate1 a n)
+
+\func replicate2 {A : \Type} (a : A) (n : Nat) : Vec A n \elim n
+  | 0 => vnil
+  | suc n => vcons a (replicate2 a n)
 
 -- 3. Реализуйте аналоги функции map для vec и Vec.
+\func map1 {A B : \Type} (f : A -> B) (n : Nat) (xs : vec A n) : vec B n \elim n, xs
+  | 0, xs => xs
+  | suc n, xs => (f xs.1, map1 f n xs.2)
+
+\func map2 {A B : \Type} (f : A -> B) {n : Nat} (xs : Vec A n) : Vec B n \elim n, xs
+  | 0, vnil => vnil
+  | suc n, vcons a xs => vcons (f a) (map2 f xs)
 
 -- 4. Реализуйте аналоги функции zipWith для vec и Vec.
 --    Функция должна принимать вектора одинаковой длины.
+\func zipWith1 {A B : \Type} (n : Nat) (as : vec A n) (bs : vec B n) : vec (\Sigma A B) n
+  | 0, as, bs => ()
+  | suc n, as, bs => ((as.1, bs.1), zipWith1 n as.2 bs.2)
+
+\func zipWith2 {A B : \Type} {n : Nat} (as : Vec A n) (bs : Vec B n) : Vec (\Sigma A B) n \elim n, as, bs
+  | 0, vnil, vnil => vnil
+  | suc n, vcons a as, vcons b bs => vcons (a, b) (zipWith2 as bs)
 
 -- 5. Определите конгруэнтность для функций двух аргументов через transport.
 --    Можно использовать любые функции, определенные через transport.
 
-\func pmap2 {A B C : \Type} (f : A -> B -> C) {a a' : A} (p : a = a') {b b' : B} (q : b = b') : f a b = f a' b' => {?}
+\func pmap2_helper1 {A B C : \Type} (f : A -> B -> C) {a a' : A} (p : a = a') {b b' : B} (q : b = b') : f a b = f a' b' =>
+  transport (\lam x => f a b = f a' x) q (transport (\lam x => f a b = f x b) p idp)
 
 -- 6. Докажите, что transport выражается через pmap и repl и наоборот.
 
 -- repl говорит, что если у нас есть два равных типа, то у нас есть функция из одного во второй.
 -- Определите repl через transport.
 
-\func repl {A B : \Type} (p : A = B) (a : A) : B => {?}
+\func repl {A B : \Type} (p : A = B) (a : A) : B => (transport (\lam a => a) p) a
 
 -- Определите transport через repl и pmap.
 
-\func transport' {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a' => {?}
+\func transport' {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a' => repl (pmap B p) b
 
 -- 7. Определите тип CTree A n полных бинарных деревьев высоты ровно n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data CTree (A : \Type) (n : Nat)
+\data CTree (A : \Type) (n : Nat) \elim n
+  | 0 => ctnil
+  | suc n => ctnode (CTree A n) (CTree A n)
 
 -- 8. Определите тип Tree A n бинарных деревьев высоты не больше n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data Tree (A : \Type) (n : Nat)
+\data Tree (A : \Type) (n : Nat) \elim n
+  | 0 => tnil
+  | n => tnode1 (CTree A n)
+  | suc n => tnode2 (Tree A n)
 
 -- определите функцию, возвращающую высоту дерева.
 
-\func height {A : \Type} (n : Nat) (t : Tree A n) : Fin (suc n) => {?}
+\func toFin (n : Nat) : Fin (suc n)
+  | 0 => fzero
+  | suc n => fsuc (toFin n)
+
+\func convertFin {n : Nat} (x : Fin n) : Fin (suc n) \elim n, x
+  | suc n, fzero => fzero
+  | suc n, fsuc x => fsuc (convertFin x)
+
+\func height {A : \Type} {n : Nat} (t : Tree A n) : Fin (suc n) \elim n, t
+  | 0, tnil => fzero
+  | 0, tnode1 c => fzero
+  | suc n, tnode1 c => toFin (suc n)
+  | suc n, tnode2 t => convertFin (height t)
 
 -- 9. Чему равно fileTest (в нормальной форме)? Докажите это.
+\func fileTestEq : fileTest = (17, 8, 13, 55, 18, 21) => idp
 
 -- 10. Чему равно M5.t''' (в нормальной форме)? Докажите это.
 
