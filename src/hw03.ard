@@ -70,29 +70,25 @@
 
 \data Tree (A : \Type) (n : Nat) \elim n
   | 0 => tnil
-  | n => tnode1 (CTree A n)
-  | suc n => tnode2 (Tree A n)
+  | suc n => tnode (Tree A n) (Tree A n)
 
 -- определите функцию, возвращающую высоту дерева.
 
-\func toFin (n : Nat) : Fin (suc n)
-  | 0 => fzero
-  | suc n => fsuc (toFin n)
-
-\func convertFin {n : Nat} (x : Fin n) : Fin (suc n) \elim n, x
-  | suc n, fzero => fzero
-  | suc n, fsuc x => fsuc (convertFin x)
+\func maxFin {n : Nat} (x y : Fin n) : Fin n \elim n, x, y
+  | suc n, fzero, y => y
+  | suc n, x, fzero => x
+  | suc n, fsuc x, fsuc y => fsuc (maxFin x y)
 
 \func height {A : \Type} {n : Nat} (t : Tree A n) : Fin (suc n) \elim n, t
   | 0, tnil => fzero
-  | 0, tnode1 c => fzero
-  | suc n, tnode1 c => toFin (suc n)
-  | suc n, tnode2 t => convertFin (height t)
+  | suc n, tnode t1 t2 => fsuc (maxFin (height t1) (height t2))
 
 -- 9. Чему равно fileTest (в нормальной форме)? Докажите это.
 \func fileTestEq : fileTest = (17, 8, 13, 55, 18, 21) => idp
 
 -- 10. Чему равно M5.t''' (в нормальной форме)? Докажите это.
+-- todo: не работает
+\func M5t''' : M5.t''' = ((82, 42, 61, 82, M4.functionModule, 42, 42, 29), 25, (42, 29)) => idp
 
 \import Utils
 \import lect03 \hiding (Vec,vnil,vcons)
@@ -102,26 +98,43 @@
 --     Функция, преобразующая Vec A n в Fin n -> A, была реализована на лекции.
 --     Реализуйте обратную функцию.
 
-\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n => {?}
+\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n \elim n, f
+  | 0, f => vnil
+  | suc n, f => vcons (f fzero) (coin (\lam n => f (fsuc n)))
 
 -- Optional task
 -- 12. Определите тип матриц и ряд функций над ними.
 
-\func Mat (A : \Type) (n m : Nat) : \Type => {?}
+\func Mat (A : \Type) (n m : Nat) : \Type => (Fin n) -> (Fin m) -> A
 
 -- диагональная матрица с элементами e на диагонали и z на остальных позициях.
 
-\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n => {?}
+\func \infix 5 == {n : Nat} (x y : Fin n) : Bool \elim n, x, y
+  | suc n, fzero, fzero => true
+  | suc n, fsuc x, fsuc y => x == y
+  | _, _, _ => false
+
+\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n =>
+  \lam i j =>
+    \case i == j \with {
+      | true => e
+      | false => z
+    }
 
 -- транспонирование матриц
 
-\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n => {?}
+\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n => \lam i j => M j i
 
 -- сложение матриц
 
-\func matAdd {A : \Type} (add : A -> A -> A) (n m : Nat) (M N : Mat A n m) : Mat A n m => {?}
+\func matAdd {A : \Type} (add : A -> A -> A) (n m : Nat) (M N : Mat A n m) : Mat A n m => \lam i j => add (M i j) (N i j)
 
 -- умножение матриц
 
+\func vecSum {A : \Type} {n : Nat} (zero : A) (add : A -> A -> A) (as : Vec A n) : A \elim n, as
+  | 0, vnil => zero
+  | suc n, vcons a as => add a (vecSum zero add as)
+
 -- z ─ нейтральный элемент по сложению.
-\func matMul {A : \Type} (z : A) (add mul : A -> A -> A) (n m k : Nat) (M : Mat A n m) (N : Mat A m k) : Mat A n k => {?}
+\func matMul {A : \Type} (z : A) (add mul : A -> A -> A) (n m k : Nat) (M : Mat A n m) (N : Mat A m k) : Mat A n k =>
+  \lam i j => vecSum z add (coin (\lam q => mul (M i q) (N q j)))
