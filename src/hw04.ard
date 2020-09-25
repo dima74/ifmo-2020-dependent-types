@@ -16,20 +16,44 @@
   | nil => nil
   | cons x xs => reverse xs ++ cons x nil
 
--- Это утверждение будет полезно для доказательства.
-\func reverse++ {A : \Type} (xs ys : List A) : reverse (xs ++ ys) = reverse ys ++ reverse xs => {?}
+\func ++nil {A : \Type} (xs : List A) : xs ++ nil = xs \elim xs
+  | nil => idp
+  | cons x xs => pmap (\lam xs => cons x xs) (++nil xs)
 
-\func reverse-isInvolutive {A : \Type} (xs : List A) : reverse (reverse xs) = xs => {?}
+\func ++assoc {A : \Type} (xs ys zs : List A) : (xs ++ ys) ++ zs = xs ++ (ys ++ zs) \elim xs
+  | nil => idp
+  | cons x xs => pmap (cons x) (++assoc xs ys zs)
+
+-- Это утверждение будет полезно для доказательства.
+\func reverse++ {A : \Type} (xs ys : List A) : reverse (xs ++ ys) = reverse ys ++ reverse xs \elim xs
+  | nil => sym (++nil (reverse ys))
+  | cons x xs =>
+    reverse (xs ++ ys) ++ cons x nil ==< pmap (\lam l => l ++ cons x nil) (reverse++ xs ys) >==
+    (reverse ys ++ reverse xs) ++ cons x nil ==< ++assoc (reverse ys) (reverse xs) (cons x nil) >==
+    reverse ys ++ (reverse xs ++ cons x nil) `qed
+
+\func reverse-isInvolutive {A : \Type} (xs : List A) : reverse (reverse xs) = xs \elim xs
+  | nil => idp
+  | cons x xs =>
+    reverse (reverse xs ++ cons x nil) ==< reverse++ (reverse xs) (cons x nil) >==
+    reverse (cons x nil) ++ reverse (reverse xs) ==< pmap (cons x) (reverse-isInvolutive xs) >==
+    cons x xs `qed
 
 -- 2. Докажите дистрибутивность умножения над сложением для натуральных чисел (выберите 1 из двух вариантов).
 
--- todo не доделано
 \func rdistr (n m k : Nat) : (m + k) * n = m * n + k * n \elim n
   | 0 => idp
   | suc n =>
     (m + k) * n + (m + k) ==< pmap (\lam e => e + (m + k)) (rdistr n m k) >==
-    m * n + k * n + (m + k) ==< {?} >==
-    m * n + m + (k * n + k) `qed
+    (m * n + k * n) + (m + k) ==< +-assoc (m * n) (k * n) (m + k) >==
+    m * n + (k * n + (m + k)) ==< pmap (\lam e => m * n + e) (
+      k * n + (m + k) ==< sym (+-assoc (k * n) m k) >==
+      (k * n + m) + k ==< pmap (\lam e => e + k) (+-comm (k * n) m) >==
+      (m + k * n) + k ==< +-assoc m (k * n) k >==
+      m + (k * n + k) `qed
+    ) >==
+    m * n + (m + (k * n + k)) ==< sym (+-assoc (m * n) m (k * n + k)) >==
+    (m * n + m) + (k * n + k) `qed
 
 \func ldistr (n m k : Nat) : n * (m + k) = n * m + n * k => {?}
 
@@ -60,7 +84,11 @@
   | 0 => 1
   | suc n => suc n * fac n
 
-\func fac/=suc (p : fac = suc) : Empty => {?}
+\func prev (x : Nat) : Nat
+  | 0 => 0
+  | suc x => x
+\func fac/=suc (p : fac = suc) : Empty
+  => zero/=suc 0 (pmap (\lam (f : Nat -> Nat) => prev (f 1)) p)
 
 -- Part III: Элиминаторы и рекурсоры
 
@@ -68,6 +96,8 @@
 \func factorial : Nat -> Nat => Nat-rec Nat 1 (\lam n result => result * (suc n))
 
 -- 7. Докажите ассоциативность сложения для натуральных чисел через Nat-elim.
+\func +-assoc' (n m k : Nat) : (n + m) + k = n + (m + k)
+  => Nat-elim (\lam k' => (n + m) + k' = n + (m + k')) idp (\lam k' p => pmap suc p) k
 
 -- 8. Определите рекурсор и элиминатор для D.
 
@@ -76,17 +106,43 @@
   | con2 D D
   | con3 (Nat -> D)
 
+\func D-elim (P : D -> \Type)
+             (f1 : \Pi (n : Nat) -> P (con1 n))
+             (f2 : \Pi (d1 d2 : D) -> P d1 -> P d2 -> P (con2 d1 d2))
+             (f3 : \Pi (g : (Nat -> D)) -> (\Pi (n : Nat) -> P (g n)) -> P (con3 g))
+             (d : D) : P d
+  \elim d
+  | con1 n => f1 n
+  | con2 d1 d2 => f2 d1 d2 (D-elim P f1 f2 f3 d1) (D-elim P f1 f2 f3 d2)
+  | con3 g => f3 g (\lam n => (D-elim P f1 f2 f3 (g n)))
+
 \func D-rec {P : \Type}
             (f1 : Nat -> P)
-            (f2 : P -> P -> P)
-            (f3 : (Nat -> P) -> P)
-            (x : D) : P
-  \elim x
+            (f2 : D -> D -> P -> P -> P)
+            (f3 : (Nat -> D) -> (Nat -> P) -> P)
+            (d : D) : P
+  \elim d
   | con1 n => f1 n
-  | con2 y1 y2 => f2 (D-rec f1 f2 f3 y1) (D-rec f1 f2 f3 y2)
-  | con3 g => f3 (\lam n => (D-rec f1 f2 f3 (g n)))
+  | con2 d1 d2 => f2 d1 d2 (D-rec f1 f2 f3 d1) (D-rec f1 f2 f3 d2)
+  | con3 g => f3 g (\lam n => (D-rec f1 f2 f3 (g n)))
 
 -- 9. Определите рекурсор и элиминатор для List.
+\func List-elim {A : \Type}
+                (P : List A -> \Type)
+                (z : P nil)
+                (c : \Pi (a : A) (as : List A) -> P as -> P (cons a as))
+                (as : List A) : (P as)
+  \elim as
+  | nil => z
+  | cons a as => c a as (List-elim P z c as)
+
+\func List-rec {A P : \Type}
+               (z : P)
+               (c : A -> List A -> P -> P)
+               (as : List A) : P
+  \elim as
+  | nil => z
+  | cons a as => c a as (List-rec z c as)
 
 -- Part IV: Интервал
 
