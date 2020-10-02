@@ -15,7 +15,7 @@
 
 \func Jalt {A : \Type} (B : \Pi (a a' : A) -> a = a' -> \Type)
            (b : \Pi (a : A) -> B a a idp)
-           {a a' : A} (p : a = a') : B a a' p => {?}
+           {a a' : A} (p : a = a') : B a a' p => J (B a) (b a) p
 
 -- Выразите J через Jalt. Можно пользоваться только Jalt, idp и всем, что через них выражается.
 -- Hint:
@@ -23,13 +23,18 @@
 -- b. Докажите, что тип \Sigma (x : A) (a = x) одноэлементный, то есть, что для любого p : \Sigma (x : A) (a = x) верно, что (x,idp) = p.
 -- c. Используя эти две конструкции, легко определить J.
 
-\func transport'' {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a' => {?}
+\func transport'' {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a'
+  -- todo нужно через Jalt
+  \elim p | idp => b
 
-\func sigma-contr {A : \Type} {a : A} (p : \Sigma (x : A) (a = x)) : (a,idp) = {\Sigma (x : A) (a = x)} p => {?}
+\func sigma-contr {A : \Type} {a : A} (p : \Sigma (x : A) (a = x)) : (a, idp) = {\Sigma (x : A) (a = x)} p => sigma-contr-impl p.1 p.2
+\func sigma-contr-impl {A : \Type} {a : A} (x : A) (p : a = x) : (a, idp) = {\Sigma (x : A) (a = x)} (x, p) \elim x, p
+  | x, idp => idp
 
 \func J' {A : \Type} {a : A} (B : \Pi (a' : A) -> a = a' -> \Type)
          (b : B a idp)
-         {a' : A} (p : a = a') : B a' p => {?}
+         {a' : A} (p : a = a') : B a' p
+  => transport'' (\lam (xq : \Sigma (x : A) (a = x)) => B xq.1 xq.2) (sigma-contr-impl a' p) b
 
 -- 3. Докажите, что vnil является нейтральным элементом для v++.
 
@@ -92,17 +97,53 @@
 -- => \case \elim x, f true \as ft, idp : f true = ft, f false \with {
 
 -- 8. Определите предикат Sublist xs ys на списках, означающий "список xs является подсписком ys".
+\data SubList {A : \Type} (xs ys : List A) \elim xs, ys
+  | nil, _ => SubList1
+  | cons x xs, cons y ys => SubList2 (x = y) (SubList xs ys)
+  | xs, cons y ys => SubList3 (SubList xs ys)
 
 -- 9. Докажите, что Sublist (filter p xs) xs для любых p и xs.
+\func filter-sublist {A : \Type} (p : A -> Bool) (xs : List A) : SubList (filter p xs) xs \elim xs
+  | nil => SubList1
+  | cons x xs => \case p x \as a
+  \return SubList
+      (\case a \with {
+        | true => cons x (filter p xs)
+        | false => filter p xs
+      })
+      (cons x xs)
+  \with {
+    | true => SubList2 idp (filter-sublist p xs)
+    | false => SubList3 (filter-sublist p xs)
+  }
 
 -- 10. Определите filter через if, а не через \case.
 --     Докажите для этой версии filter лемму filter-lem.
 
-\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A => {?}
+\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A \elim xs
+  | nil => nil
+  | cons x xs => if (p x) (cons x (filter' p xs)) (filter' p xs)
 
-\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : length (filter' p xs) Nat.<= length xs => {?}
+\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : length (filter' p xs) Nat.<= length xs \elim xs
+  | nil => Nat.zero<=_
+  | cons x xs =>
+    \case p x \as a
+    \return length (if a (cons x (filter' p xs)) (filter' p xs)) Nat.<= suc (length xs)
+    \with {
+      | true => Nat.suc<=suc (filter-lem p xs)
+      | false => <=-step-lem (filter-lem p xs)
+    }
 
 -- 11. Закончите определение функции \func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x из лекции.
+\func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x
+  => \case f true \as ft, idp : f true = ft, f false \as ff, idp : f false = ff, \elim x \with {
+    | true, p, _, q, true => pmap (\lam z => f (f z)) p *> pmap f p
+    | true, p, true, q, false => pmap (\lam z => f (f z)) q *> pmap f p *> p *> sym q
+    | false, p, true, q, true => pmap (\lam z => f (f z)) p *> pmap f q *> p *> sym p
+    | false, p, true, q, false => pmap (\lam z => f (f z)) q *> pmap f p *> q *> sym q
+    | false, p, false, q, true => pmap (\lam z => f (f z)) p *> pmap f q *> q *> sym p
+    | _, p, false, q, false => pmap (\lam z => f (f z)) q *> pmap f q
+  }
 
 -- Optional:
 -- 12. Парадокс Рассела показывает, что не существует множества всех множеств.
@@ -114,5 +155,6 @@
 -- Верно, что в общем случае существование такого утверждения влечет противоречие.
 -- Это легко доказать при помощи исключенного третьего, но утверждение верно и без него.
 -- Докажите этот факт.
-\func contrProp {A : \Type} (p : A -> Not A) (q : Not A -> A) : Empty
-  => {?}
+\func contrProp {A : \Type} (p : A -> Not A) (q : Not A -> A) : Empty =>
+  \let | a => q (\lam a' => p a' a')
+  \in p a a
