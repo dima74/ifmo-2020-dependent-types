@@ -5,7 +5,8 @@
 
 -- 1. Докажите pmap при помощи паттерн матчинга с idp.
 
-\func pmap {A B : \Type} (f : A -> B) {a a' : A} (p : a = a') : f a = f a' => {?}
+\func pmap {A B : \Type} (f : A -> B) {a a' : A} (p : a = a') : f a = f a' \elim p
+  | idp => idp
 
 -- Optional:
 -- 2. У оператора J есть другая форма, которую мы будем называть Jalt. Докажите, что J и Jalt эквивалентны, то есть выразите одно через другое и наоборот.
@@ -32,11 +33,26 @@
 
 -- 3. Докажите, что vnil является нейтральным элементом для v++.
 
-\func vnil-rightId {A : \Type} {n : Nat} (xs : Vec A n) : transport (Vec A) (+-comm 0 n) (xs v++ vnil) = xs => {?}
+\func vnil-rightId {A : \Type} {n : Nat} (xs : Vec A n) : transport (Vec A) (+-comm 0 n) (xs v++ vnil) = xs \elim n, xs
+  | 0, vnil => idp
+  | suc n, vcons x xs => aux x (xs v++ vnil) xs (+-comm 0 n) (vnil-rightId xs)
+  \where {
+    \func aux
+      {A : \Type} {i j : Nat}
+      (x : A)
+      (as : Vec A i) (bs : Vec A j)
+      (p : i = j)
+      (t : transport (Vec A) p as = bs)
+      : transport (Vec A) (Utils.pmap suc p) (vcons x as) = vcons x bs
+    \elim p
+      | idp => pmap (vcons x) t
+  }
 
 -- 4. Определите предикат принадлежности элемента списку.
 
-\data In {A : \Type} (a : A) (xs : List A)
+\data In {A : \Type} (a : A) (xs : List A) \elim xs
+  | cons x xs => inHead (x = a)
+  | cons x xs => inTail (In a xs)
 
 -- Optional:
 -- 5. Докажите эквивалентность четырех различных определений LessOrEq: lessOrEq, lessOrEq', LessOrEq и LessOrEq'.
@@ -45,12 +61,35 @@
 --    То есть ReflTransClosure R -- это минимальное рефлексивное и транзитивное отношение, содержащее R.
 
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
+  | self (R x y)
+  | refl (x = y)
+  | trans (z : A) (ReflTransClosure R x z) (ReflTransClosure R z y)
 
 -- 7. Докажите, что если R уже рекфлексивно и транзитивно, то ReflTransClosure R эквивалентно R.
 
-\func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type) (refl : \Pi (x : A) -> R x x) (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
+\func ReflTransClosure-lem {A : \Type}
+                           (R : A -> A -> \Type)
+                           (refl : \Pi (x : A) -> R x x)
+                           (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
   : \Pi (x y : A) -> R x y <-> ReflTransClosure R x y
-  => {?}
+  => \lam (x y : A) => ((\lam (r : R x y) => self r), helper R refl trans x y)
+  \where {
+    \func helper {A : \Type}
+                 (R : A -> A -> \Type)
+                 (refl : \Pi (x : A) -> R x x)
+                 (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
+                 (x y : A)
+                 (r : ReflTransClosure R x y) : R x y
+    \elim r
+      | self rxy => rxy
+      | ReflTransClosure.refl rxx => \case \elim x, rxx \with { | x, idp => refl x }
+      | ReflTransClosure.trans z rxz rzy => trans x z y (helper R refl trans x z rxz) (helper R refl trans z y rzy)
+  }
+
+-- Note: \elim
+-- \case x \as x, f true \as ft, idp : f true = ft, f false \return f (f (f x)) = f x \with
+-- => \case \elim x, f true \as ft, idp : f true = ft, f false \return f (f (f x)) = f x \with
+-- => \case \elim x, f true \as ft, idp : f true = ft, f false \with {
 
 -- 8. Определите предикат Sublist xs ys на списках, означающий "список xs является подсписком ys".
 
