@@ -1,45 +1,112 @@
 \import Utils
+\import hw01 (gcd)
+\import lect04
 \import lect06
 \open Nat(+)
 
 -- 1. Определите функцию swap несколькими способами.
 
 -- При помощи \cowith и доступа к полям.
-\func swap {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap {A B : \Type} (p : Pair A B) : Pair B A \cowith
+  | fst_ => p.snd_
+  | snd_ => p.fst_
 
 -- При помощи \new и паттерн матчинга.
-\func swap' {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap' {A B : \Type} (p : Pair A B) : Pair B A \elim p
+  | (a, b) => \new Pair { | fst_ => b | snd_ => a }
 
 -- При помощи \new и доступа к полям.
-\func swap'' {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap'' {A B : \Type} (p : Pair A B) : Pair B A =>
+  \new Pair { | fst_ => p.snd_ | snd_ => p.fst_ }
 
 -- 2. Докажите, что swap (swap p) = p.
 
-\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p => {?}
+\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p => idp
 
 -- 3. Докажите, что тип PosNat 0 пустой, а тип PosNat 1 нет.
 
-\func zero-isNotPos (p : PosNat 0) : Empty => {?}
+\func zero-isNotPos (p : PosNat 0) : Empty => p.p
 
-\func one-isPos : PosNat 1 => {?}
+\func one-isPos : PosNat 1 => \new PosNat 1 ()
 
 -- 4. Определите \record, состоящий из пар взаимно простых натуральных чисел.
 --    Определите тип, состоящий из натуральных чисел, взаимно простых с 60.
+\record Coprime (a b : Nat) (p : gcd a b = 1)
+\func Coprime60 => Coprime 60
 
 -- 5. Закончите определение класса монад. Этот класс должен содержать все монадные законы и реализовывать все поля из класса функторов.
 
 \class Monad \extends Functor
   | return {A : \Type} : A -> F A
   | \infixl 1 >>= {A B : \Type} : F A -> (A -> F B) -> F B
+  | left-identity {A B : \Type} (a : A) (f : A -> F B) : ((return a) >>= f) = f a
+  | right-identity {A : \Type} (m : F A) : (m >>= return) = m
+  | associativity {A B C : \Type} (m : F A) (f : A -> F B) (g : B -> F C) : ((m >>= f) >>= g) = (m >>= (\lam x => f x >>= g))
+  | fmap {A B : \Type} (f : A -> B) => \lam fa => fa >>= (\lam a => return (f a))
+  | fmap-id {A : \Type} (y : F A) => right-identity y
+  | fmap-comp {A B C : \Type} (f : A -> B) (g : B -> C) (y : F A) =>
+    fmap (\lam x => g (f x)) y ==< idp >==
+    (y >>= (\lam a => return (g (f a)))) ==< pmap (\lam e => y >>= e) (
+      (\lam a => return (g (f a))) ==<
+      funExt
+          (\lam _ => F C)
+          (\lam a => sym (left-identity (f a) (\lam b => return (g b))))
+        >==
+      (\lam a => return (f a) >>= (\lam b => return (g b))) `qed
+    ) >==
+    (y >>= (\lam a => return (f a) >>= (\lam b => return (g b)))) ==< sym (associativity y (\lam a => return (f a)) (\lam b => return (g b))) >==
+    (y >>= (\lam a => return (f a)) >>= (\lam b => return (g b))) ==< idp >==
+    fmap g (fmap f y) `qed
 
 -- 6. Определите \instance Monad для Maybe.
 
-\instance MaybeMonad : Monad Maybe => {?}
+\instance MaybeMonad : Monad Maybe
+  | return => just
+  | >>= {A B : \Type} (m : Maybe A) (f : A -> Maybe B) : Maybe B \elim m {
+    | nothing => nothing
+    | just a => f a
+  }
+  | left-identity {A B : \Type} (a : A) (f : A -> Maybe B) => idp
+  | right-identity {A : \Type} (m : Maybe A) => \case \elim m \with {
+    | nothing => idp
+    | just a => idp
+  }
+  | associativity {A B C : \Type} (m : Maybe A) (f : A -> Maybe B) (g : B -> Maybe C) => \case \elim m \with {
+    | nothing => idp
+    | just a => idp
+  }
 
 -- 7. Определите \instance Monad для State и State'.
 
 \record State (S A : \Type)
   | state : S -> \Sigma S A
 
+\instance StateMonad {S : \Type} : Monad (State S)
+  | return {A : \Type} (a : A) => \new State { | state s => (s, a) }
+  | >>= {A B : \Type} (m : State S A) (f : A -> State S B) => \new State {
+    | state s => \case state {m} s \with {
+    (s, a) => state {f a} s
+    }
+  }
+  | left-identity {A B : \Type} (a : A) (f : A -> State S B) => idp
+  | right-identity {A : \Type} (m : State S A) => idp
+  | associativity {A B C : \Type} (m : State S A) (f : A -> State S B) (g : B -> State S C) => idp
+
 \data State' (S A : \Type)
   | state' (S -> \Sigma S A)
+
+\instance State'Monad {S : \Type} : Monad (State' S)
+  | return {A : \Type} (a : A) => state' (\lam s => (s, a))
+  | >>= {A B : \Type} (m : State' S A) (f : A -> State' S B) =>
+    state' (
+      \lam s => \case m \with {
+        | state' m => \case m s \with {
+          (s, a) => \case f a \with {
+            | state' fa => fa s
+          }
+        }
+      }
+    )
+  | left-identity {A B : \Type} (a : A) (f : A -> State' S B) => {?}  -- todo
+  | right-identity {A : \Type} (m : State' S A) => {?}  -- todo
+  | associativity {A B C : \Type} (m : State' S A) (f : A -> State' S B) (g : B -> State' S C) => {?}  -- todo
