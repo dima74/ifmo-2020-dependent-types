@@ -1,9 +1,44 @@
+\import Meta
 \import Utils
 
 -- 1. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия:
 --    * filter p xs является подсписком xs
 --    * Все элементы filter p xs удовлетворяют предикату p
 --    * Любой подсписок xs с тем же свойством является подсписком filter p xs
+\func filter {A : \Type} (p : A -> Bool) (xs : List A) : List A \elim xs
+  | nil => nil
+  | cons x xs => \case p x \with {
+    | true => cons x (filter p xs)
+    | false => filter p xs
+  }
+
+-- filter p xs является подсписком xs
+\data Sublist {A : \Type} (xs ys : List A) \elim xs, ys
+  | nil, nil => sublist-nil
+  | cons x xs, cons y ys => sublist-cons (x = y) (Sublist xs ys)
+  | xs, cons y ys => sublist-head (Sublist xs ys)
+\func filter-sublist {A : \Type} (p : A -> Bool) (xs : List A) : Sublist (filter p xs) xs \elim xs
+  | nil => sublist-nil
+  | cons x xs => mcases \with {
+    | true => sublist-cons idp (filter-sublist p xs)
+    | false => sublist-head (filter-sublist p xs)
+  }
+
+-- Все элементы filter p xs удовлетворяют предикату p
+\data Matches {A : \Type} (p : A -> Bool) (xs : List A) \elim xs
+  | nil => matches-nil
+  | cons x xs => matches-cons (T (p x)) (Matches p xs)
+\func filter-matches {A : \Type} (p : A -> Bool) (xs : List A) : Matches p (filter p xs) \elim xs
+  | nil => matches-nil
+  -- кажется я опять запутался в паттен матчинге по idp,
+  -- может есть какой-нибудь способ проще (без transport например)?
+  | cons x xs => \case p x \as px, idp : p x = px \return Matches p (\case px \with {
+    | true => cons x (filter p xs)
+    | false => filter p xs
+  }) \with {
+    | true, q => matches-cons (transport (\lam b => T b) (sym q) ()) (filter-matches p xs)
+    | false, q => filter-matches p xs
+  }
 
 -- 2. Определите trans и sym через rewrite.
 
