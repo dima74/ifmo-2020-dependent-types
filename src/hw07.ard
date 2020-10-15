@@ -1,4 +1,5 @@
 \import Meta
+\import Paths.Meta
 \import Utils
 
 -- 1. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия:
@@ -27,19 +28,76 @@
 -- Все элементы filter p xs удовлетворяют предикату p
 \data Matches {A : \Type} (p : A -> Bool) (xs : List A) \elim xs
   | nil => matches-nil
-  | cons x xs => matches-cons (T (p x)) (Matches p xs)
+  | cons x xs => matches-cons (p x = true) (Matches p xs)
 \func filter-matches {A : \Type} (p : A -> Bool) (xs : List A) : Matches p (filter p xs) \elim xs
   | nil => matches-nil
-  -- кажется я опять запутался в паттен матчинге по idp,
-  -- может есть какой-нибудь способ проще (без transport например)?
   | cons x xs => \case p x \as px, idp : p x = px \return Matches p (\case px \with {
     | true => cons x (filter p xs)
     | false => filter p xs
   }) \with {
-    | true, q => matches-cons (transport (\lam b => T b) (sym q) ()) (filter-matches p xs)
+    | true, q => matches-cons q (filter-matches p xs)
     | false, q => filter-matches p xs
   }
 
+-- Любой подсписок xs с тем же свойством является подсписком filter p xs
+\func part3 {A : \Type}
+            (p : A -> Bool)
+            (xs ys : List A)
+            (xs_in_ys : Sublist xs ys)
+            (xs_matches : Matches p xs)
+  : Sublist xs (filter p ys) \elim xs, ys, xs_in_ys, xs_matches
+  | nil, nil, sublist-nil, matches-nil => sublist-nil
+  | xs, cons y ys, sublist-head xs_in_ys, xs_matches => mcases \with {
+    | true => sublist-head (part3 p xs ys xs_in_ys xs_matches)
+    | false => part3 p xs ys xs_in_ys xs_matches
+  }
+  | cons x xs, cons y ys, sublist-cons x=y xs_in_ys, matches-cons px xs_matches => \case p y \as py, idp : p y = py 
+  \return Sublist (cons x xs) (\case py \with {
+    | true => cons y (filter p ys)
+    | false => filter p ys
+  }) \with {
+    | true, _ => sublist-cons x=y (part3 p xs ys xs_in_ys xs_matches)
+    | false, py =>
+      -- немного подозрительный способ
+      \let
+        | temp1 => rewrite x=y px
+        | temp2 => (sym py) *> temp1
+      \in \case temp2 \with {}
+  }
+
 -- 2. Определите trans и sym через rewrite.
+\func trans' {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a'' => rewrite p q
+\func sym' {A : \Type} {a a' : A} (p : a = a') : a' = a => rewrite p idp
 
 -- 3. Перепешите insert-perm, insert-lem и insert-sorted через mcases.
+\import lect07
+\module task3 \where {
+  \open sort
+
+  \func insert-perm {A : TotalPreorder} (a : A) (xs : List A)
+    : Perm (cons a xs) (insert a xs) \elim xs
+    | nil => perm-refl
+    | cons a1 xs => mcases \with {
+      | inl a1<=a => perm-trans (perm-perm idp idp idp) (perm-cons idp (insert-perm a xs))
+      | inr a<=a1 => perm-refl
+    }
+
+  \func insert-lem {A : TotalPreorder} (a a1 : A) {xs : List A}
+                   (a1<=a : a1 <= a) (p : a1 <= headDef a1 xs)
+    : a1 <= headDef a1 (insert a xs) \elim xs
+    | nil => a1<=a
+    | cons a2 xs => mcases \with {
+      | inl a2<=a => p
+      | inr a<=a2 => a1<=a
+    }
+
+  \func insert-sorted {A : TotalPreorder} (a : A) {xs : List A} (s : Sorted xs)
+    : Sorted (insert a xs) \elim xs
+    | nil => sorted-cons <=-refl sorted-nil
+    | cons a1 xs => mcases \with {
+      | inl a1<=a => \case s \with {
+        | sorted-cons p s' \as s => sorted-cons (insert-lem a a1 a1<=a p) (insert-sorted a s')
+      }
+      | inr a<=a1 => sorted-cons a<=a1 s
+    }
+}
