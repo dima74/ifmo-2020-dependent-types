@@ -1,14 +1,74 @@
 \import Data.List
+\import Meta
 \import Order.LinearOrder
+\import Paths (*>, pmap)
+\import Paths.Meta
+\import Utils (sym)
 \import lect08
 \open LinearOrder
 
 -- 1. Докажите, что Perm l1 l2 тогда и только тогда, когда Insertion.sort l1 = Insertion.sort l2.
 
+\func perm-sort-equiv1 {A : Dec} {xs ys : List A} (p : Perm xs ys) : Insertion.sort xs = Insertion.sort ys \elim xs, ys, p
+  | nil, nil, perm-nil => idp
+  | :: x xs, :: y ys, perm-:: x=y p => rewrite x=y (pmap (Insertion.sort.insert y) (perm-sort-equiv1 p))
+  | :: x (:: x' xs), :: y (:: y' ys), perm-swap x=y' x'=y xs=ys =>
+    sym (run {
+      rewrite x=y',
+      rewrite x'=y,
+      rewrite xs=ys,
+      Insertion.sort-perm.insert-comm y y' (Insertion.sort ys)
+    })
+  | xs, ys, perm-trans p1 p2 => (perm-sort-equiv1 p1) *> (perm-sort-equiv1 p2)
+
+\func perm-sort-equiv2 {A : Dec} {xs ys : List A} (p : Insertion.sort xs = Insertion.sort ys) : Perm xs ys =>
+  \let
+    | xs_sortxs => Insertion.sort-perm xs
+    | ys_sortys => Insertion.sort-perm ys
+    | sortys_ys => perm-sym ys_sortys
+    | sortxs_sortys => perm-equal p
+    | sortxs_ys => perm-trans sortxs_sortys sortys_ys
+    | xs_ys => perm-trans xs_sortxs sortxs_ys
+  \in
+    xs_ys
+
+\lemma perm-equal {A : \Type} {xs ys : List A} (p : xs = ys) : Perm xs ys \elim p
+  | idp => perm-refl
+
+\lemma perm-sym {A : \Type} {xs ys : List A} (p : Perm xs ys) : Perm ys xs \elim xs, ys, p
+  | nil, nil, perm-nil => perm-nil
+  | :: x xs, :: y ys, perm-:: x=y p => perm-:: (sym x=y) (perm-sym p)
+  | :: x (:: x' xs), :: y (:: y' ys), perm-swap x=y' x'=y xs=ys => perm-swap (sym x'=y) (sym x=y') (sym xs=ys)
+  | xs, ys, perm-trans p1 p2 => perm-trans (perm-sym p2) (perm-sym p1)
+
 -- 2. Докажите, что спецификация "результат является перестановкой входа и отсортирован" является полной для функции sort.
 
-\func completeness {A : Dec} (sort : List A -> List A) (l : List A) (p : Perm l (sort l)) (s : Sorted (sort l)) : sort l = Insertion.sort l
-  => {?}
+\func completeness {A : Dec} (sort1 : List A -> List A) (l : List A) (p1 : Perm l (sort1 l)) (s1 : Sorted (sort1 l)) : sort1 l = Insertion.sort l =>
+  \let
+    | p2 => Insertion.sort-perm l
+    | s2 => Insertion.sort-sorted l
+    | p => perm-trans (perm-sym p1) p2
+  \in
+    aux s1 s2 p
+  \where {
+    \func aux {A : Dec} {l1 l2 : List A} (s1 : Sorted l1) (s2 : Sorted l2) (p : Perm l1 l2) : l1 = l2 =>
+      run {
+        rewrite (sorted-sort s1),
+        rewrite (sorted-sort s2),
+        perm-sort-equiv1 p
+      }
+  }
+
+-- todo
+\lemma sorted-sort {A : Dec} {xs : List A} (s : Sorted xs) : xs = Insertion.sort xs \elim xs, s
+  | nil, sorted-nil => idp
+  | :: x xs, sorted-cons x<= s => rewrite (sym (sorted-sort s)) (
+    \case xs \with {
+      -- почему-то insert не вычисляется в {?}
+      | nil => {?}
+      | :: x xs => {?}
+    }
+  )
 
 -- 3. Определите факториал через хвостовую рекурсию.
 --    Докажите, что он равен обычному определению факториала.
