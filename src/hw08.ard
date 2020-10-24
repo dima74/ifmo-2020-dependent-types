@@ -1,4 +1,7 @@
+\import Arith.Nat
 \import Data.List
+\import Data.Or
+\import Logic.Meta
 \import Meta
 \import Order.LinearOrder
 \import Paths (*>, pmap)
@@ -59,16 +62,39 @@
       }
   }
 
--- todo
 \lemma sorted-sort {A : Dec} {xs : List A} (s : Sorted xs) : xs = Insertion.sort xs \elim xs, s
   | nil, sorted-nil => idp
   | :: x xs, sorted-cons x<= s => rewrite (sym (sorted-sort s)) (
-    \case xs \with {
-      -- почему-то insert не вычисляется в {?}
-      | nil => {?}
-      | :: x xs => {?}
+    \case \elim xs, x<= \with {
+      | nil, _ => idp
+      | :: x2 xs2, x<=x2 => mcases \with {
+        | inl x2<x => contradiction
+        | inr x<=x2 => idp
+      }
     }
   )
 
 -- 3. Определите факториал через хвостовую рекурсию.
 --    Докажите, что он равен обычному определению факториала.
+\func factorial1 (n : Nat) : Nat
+  | 0 => 1
+  | suc n => (suc n) Nat.* (factorial1 n)
+
+\func factorial2 (n : Nat) : Nat => impl n 1
+  \where {
+    \func impl (n result : Nat) : Nat \elim n
+      | 0 => result
+      | suc n => impl n (result Nat.* (suc n))
+  }
+
+\lemma factorial-eq (n : Nat) : factorial2 n = factorial1 n => impl n 1 *> (NatSemiring.*-comm *> NatSemiring.+-comm)
+  \where {
+    -- хотим:
+    -- r * f1(n) = f2impl(n, r)
+    -- r * n * f1(n-1) = f2impl(n-1, r * n)
+    -- по индкуции:
+    -- r * f1(n-1) = f2impl(n-1, r)
+    \lemma impl (n result : Nat) : factorial2.impl n result = result Nat.* factorial1 n \elim n
+      | 0 => idp *> NatSemiring.+-comm
+      | suc n => impl n (result Nat.* (suc n)) *> NatSemiring.*-assoc
+  }
