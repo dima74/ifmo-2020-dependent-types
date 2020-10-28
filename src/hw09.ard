@@ -1,12 +1,32 @@
+\import Logic.Meta
+\import Meta
 \import Utils
+\import lect04 (funExt)
 \import lect09
-\open Nat(+,*)
+\open Nat (+, *)
 
 -- 1. Докажите, что предикат isEven разрешим.
 
 \func isEven (n : Nat) => \Sigma (k : Nat) (n = 2 * k)
 
-\func isEven-dec : DecPred isEven => {?}
+\func isEven-dec : DecPred isEven => \lam a => impl a
+  \where {
+    \func impl (n : Nat) : Decide (isEven n) \elim n {
+      | 0 => yes (0, idp)
+      | suc 0 => no (\case __ \with {
+        | (k, n=2k) => \case \elim k, n=2k \with {
+          | 0, ()
+        }
+      })
+      | suc (suc n) => \case impl n \with {
+        | yes (k, n=2k) => yes (suc k, pmap suc (pmap suc n=2k))
+        | no p => no (\case __ \with {
+          | (suc k2, n2=2k2) => p (k2, pmap pred (pmap pred n2=2k2))
+          | (0, n2=2k2) => contradiction
+        })
+      }
+    }
+  }
 
 -- 2. Докажите, что если равенство элементов A разрешимо, то и равенство элементов List A тоже разрешимо.
 
@@ -15,7 +35,25 @@
 
 -- 3. Докажите, что функции FromBoolToDec и FromDecToBool взаимно обратны.
 
-\func bdb {A : \Type} (p : A -> Bool) : FromDecToBool (FromBoolToDec p) = p => {?}
+\func bdb {A : \Type} (p : A -> Bool) : FromDecToBool (FromBoolToDec p) = p => funExt (\lam _ => Bool) (
+  \lam a =>
+      \case p a \as pa \return (
+        (\case
+          (\case pa \as x \return Decide (T x) \with {
+            | true => yes ()
+            | false => no (\lam x => x)
+          })
+        \with {
+          | yes _ => true
+          | no _ => false
+        }) = pa
+      )
+      \with {
+        -- unfold (FromDecToBool, FromBoolToDec) {?}
+        | true => idp
+        | false => idp
+      }
+)
 
 -- Мы не можем доказать, что FromBoolToDec (FromDecToBool P) = P, но мы можем доказать более слабое утверждение: эти предикаты логически эквивалентны.
 -- Для этого введем эквивалентность предикатов.
