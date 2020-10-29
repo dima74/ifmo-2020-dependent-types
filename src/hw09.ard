@@ -1,6 +1,9 @@
+\import Algebra.Meta
 \import Logic.Meta
 \import Meta
+\import Paths.Meta
 \import Utils
+\import lect01 ()
 \import lect04 (funExt)
 \import lect09
 \open Nat (+, *)
@@ -31,7 +34,28 @@
 -- 2. Докажите, что если равенство элементов A разрешимо, то и равенство элементов List A тоже разрешимо.
 
 \instance ListEq {A : \Type} (dec : Eq A) : Eq (List A)
-  | decideEq => {?}
+  | decideEq => \lam xs ys => impl xs ys dec
+  \where {
+    \func impl {A : \Type} (xs ys : List A) (dec : Eq A) : Decide (xs = ys) \elim xs, ys
+      | nil, nil => yes idp
+      | cons x xs, cons y ys => \case decideEq x y, impl xs ys dec \with {
+        | yes x=y, yes xs=ys => yes (rewrite x=y (rewrite xs=ys idp))
+        | yes x=y, no xs/=ys => no (\lam p => xs/=ys (tailHelper p))
+        | no x/=y, _ => no (\lam p => x/=y (headHelper p))
+      }
+      | cons x xs, nil => no (\lam p => contradiction)
+      | nil, cons y ys => no (\lam p => contradiction)
+    \func headHelper {A : \Type} {x y : A} {xs ys : List A} (p : cons x xs = cons y ys) : x = y =>
+      pmap (\case __ \with {
+        | nil => x
+        | cons z zs => z
+      }) p
+    \func tailHelper {A : \Type} {x y : A} {xs ys : List A} (p : cons x xs = cons y ys) : xs = ys =>
+      pmap (\case __ \with {
+        | nil => xs
+        | cons z zs => zs
+      }) p
+  }
 
 -- 3. Докажите, что функции FromBoolToDec и FromDecToBool взаимно обратны.
 
@@ -59,19 +83,41 @@
 -- Для этого введем эквивалентность предикатов.
 
 \func dbd {A : \Type} (P : \Sigma (P : A -> \Type) (DecPred P))
-  : \Pi (x : A) -> (FromBoolToDec (FromDecToBool P)).1 x <-> P.1 x
-  => {?}
+  : \Pi (x : A) -> (FromBoolToDec (FromDecToBool P)).1 x <-> P.1 x =>
+  \lam x => (
+    \lam q => helper P x (P.2 x) q,
+    \lam p1x => \case P.2 x \as p2x \return (
+    -- unfold (FromDecToBool, FromBoolToDec) {?}
+      T (\case p2x \with {
+        | yes _ => true
+        | no _ => false
+      })
+    ) \with {
+      | yes _ => ()
+      | no n => n p1x
+    }
+  )
+  \where {
+    \func helper {A : \Type} (P : \Sigma (P : A -> \Type) (DecPred P))
+                 (x : A)
+                 (p2x : Decide (P.1 x))
+                 (q : T (\case p2x \with {| yes _ => true | no _ => false}))
+      : P.1 x
+    \elim p2x
+      | yes p1x => p1x
+      | no _ => contradiction
+  }
 
 -- 4. Укажите явно чему равен уровень в каждом из вызовов id' ниже.
 --    Напишите явно чему равны типы всех функций idTest*.
 
 \func id' {A : \Type} (a : A) => a
 
-\func idTest1 => id' (id' id)
-\func idTest2 => id' Maybe
-\func idTest3 => id' Functor
-\func idTest4 => id' (Functor Maybe)
-\func idTest5 (f : \Pi {A B : \Set} -> (A -> B) -> Maybe A -> Maybe B) => id' (Functor Maybe f)
+\func idTest1 : \Pi (A : \Type) -> A -> A => id' (\suc \lp) (id' (\suc \lp) id)
+\func idTest2 : \Type \lp -> \Type \lp => id' (\suc \lp) Maybe
+\func idTest3 : \Type => id' (\suc (\suc \lp)) Functor
+\func idTest4 : \Type => id' (\suc (\suc \lp)) (Functor Maybe)
+\func idTest5 (f : \Pi {A B : \Set} -> (A -> B) -> Maybe A -> Maybe B) : \Type => id' (\suc \lp) (Functor Maybe f)
 
 -- 5. Докажите следующий принцип индукции для списков.
 
@@ -79,8 +125,45 @@
   {A : \Type}
   (E : List A -> \Type)
   (r : \Pi (xs : List A) -> (\Pi (ys : List A) -> length ys < length xs -> E ys) -> E xs)
-  (xs : List A) : E xs => {?}
+  (xs : List A) : E xs => impl E r xs xs <=-refl
+  \where {
+    \func impl
+      {A : \Type}
+      (E : List A -> \Type)
+      (r : \Pi (xs : List A) -> (\Pi (zs : List A) -> length zs < length xs -> E zs) -> E xs)
+      (xs ys : List A) (xs<=ys : length xs Nat.<= length ys) : E xs \elim xs, ys
+      | nil, nil => r nil (\lam zs zs<nil => contradiction)
+      | cons x xs, nil => contradiction
+      | xs, cons y ys => r xs (\lam zs zs<xs => impl E r zs ys (\case (<=-trans zs<xs xs<=ys) \with { | Nat.suc<=suc zs<=ys => zs<=ys }))
+  }
 
 -- 6. Определите div через Nat-ind.
 
-\func div (n k : Nat) (p : 0 < k) : Nat => {?}
+-- todo
+\func div (n k : Nat) (p : 0 < k) : Nat =>
+  Nat-ind (\lam _ => Nat) (\lam n f =>
+      if (less n k) 0 (1 + f (n - k) {?})
+  ) n
+  \where {
+    \open lect01 (-)
+    \open Nat (<=, zero<=_, suc<=suc)
+    \func less (x y : Nat) : Bool
+      | 0, 0 => false
+      | 0, suc y => true
+      | suc x, 0 => false
+      | suc x, suc y => less x y
+  }
+-- почему-то я подумал что div будет просты выразить через mod...
+\func mod (n k : Nat) (p : 0 < k) : Nat =>
+  Nat-ind (\lam _ => Nat) (helper1 __ k __) n
+  \where {
+    \open lect01 (-)
+    \open Nat (<=, zero<=_, suc<=suc)
+    \func helper1 (n k : Nat) (f : \Pi (k : Nat) -> k < n -> Nat) : Nat \elim n
+      | 0 => 0
+      | suc n =>
+        \let
+          | r => f n <=-refl + 1
+        \in
+          if (r Eq.== k) 0 r
+  }
