@@ -1,6 +1,12 @@
+\import Algebra.Meta
+\import Logic.Meta
 \import lect09 (Decide)
 \import lect11
 \import Utils \hiding (<=-refl)
+
+-- 1,3,4,5,7 - лёгкие
+-- 2 - на подумать
+-- 8,9,10,11 - доказать эквивалентность множеств, не так легко
 
 -- 1. Пусть f : A -> B и g : B -> C ─ некоторые функции.
 --    Докажите, что если f и g инъективны, то g `o` f также инъективна.
@@ -9,16 +15,28 @@
 -- Композиция функций
 \func \fixr 9 o {A B C : \Type} (g : B -> C) (f : A -> B) => \lam a => g (f a)
 
-\func o-inj {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj f) (q : isInj g) : isInj (g `o` f) => {?}
+\func o-inj {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj f) (q : isInj g) : isInj (g `o` f) =>
+  \lam x y r => p x y (q (f x) (f y) r)
 
-\func o-inj' {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj (g `o` f)) : isInj f => {?}
+\func o-inj' {A B C : \Type} (f : A -> B) (g : B -> C) (p : isInj (g `o` f)) : isInj f =>
+  \lam x y r => p x y (pmap g r)
 
 -- 2. Определите предикат "делится на 3 или на 5" так, чтобы он возвращал утверждения.
 --    Докажите, что MultipleOf3Or5 вкладывается в ℕ.
 
-\func isMultipleOf3Or5 (n : Nat) : \Type => {?}
+\func isMultipleOf3Or5 (n : Nat) : \Type => mod3 n Nat.* mod5 n = 0
 
-\func isMultipleOf3Or5-isProp (n : Nat) : isProp (isMultipleOf3Or5 n) => {?}
+\func isMultipleOf3Or5-isProp (n : Nat) : isProp (isMultipleOf3Or5 n) =>
+  \lam p q => helper (mod3 n Nat.* mod5 n) p q
+  \where {
+    \func helper (k : Nat) (p q : k = 0) : p = q \elim k, p
+      -- todo
+      | k, idp => {?}
+--    \func helper2 (k : Nat) (p q : k = 0) : p = q \elim k
+--      -- todo
+--      | 0 => retract-isProp {0 = 0} Unit-isProp (\lam _ => ()) (\lam _ => idp) (\lam r => {?}) p q
+--      | suc k => contradiction
+  }
 
 \func MultipleOf3Or5 => \Sigma (n : Nat) (isMultipleOf3Or5 n)
 
@@ -69,7 +87,8 @@
 -- 8. Докажите, что тип с разрешимым равенством являетя множеством.
 
 \func Dec-isSet {A : \Type} (dec : \Pi (x y : A) -> Decide (x = y)) : isSet A
-  => {?}
+  -- todo
+  => \lam x y => retract-isProp {x = y} Unit-isProp (\lam z => ()) (\lam z => {?}) {?}
 
 -- 9. Если A и B являются множествами, то A `Or` B тоже является множеством.
 
