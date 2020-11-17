@@ -38,6 +38,10 @@
 --      | suc k => contradiction
   }
 
+-- как это доказать ...
+-- кажется что к этому сводятся 2 и 6
+\func my (p q : 0 = 0) : p = q => {?}
+
 \func MultipleOf3Or5 => \Sigma (n : Nat) (isMultipleOf3Or5 n)
 
 \func Mul-inc (m : MultipleOf3Or5) => m.1
@@ -51,11 +55,24 @@
 
 \func \infix 1 <-> (A B : \Type) => \Sigma (A -> B) (B -> A)
 
-\func isTriv-lem (A : \Type) : isTriv A <-> (\Sigma (isProp A) A) => {?}
+\func isTriv-lem (A : \Type) : isTriv A <-> (\Sigma (isProp A) A) =>
+  (
+    \case __ \with {
+      (a, p) => (\lam x y => sym (p x) *> p y, a)
+    },
+    \case __ \with {
+      (p, a) => (a, \lam a' => p a a')
+    }
+  )
 
 -- 4. Докажите, что Either не является утверждением в общем случаем.
 
-\func Either-isProp (p : \Pi {A B : \Type} (pA : isProp A) (pB : isProp B) -> isProp (Either A B)) : Empty => {?}
+\func Either-isProp (p : \Pi {A B : \Type} (pA : isProp A) (pB : isProp B) -> isProp (Either A B)) : Empty =>
+  \let
+    | q => p Unit-isProp Unit-isProp
+    | q2 => q (Either.inl ()) (Either.inr ())
+  \in
+    contradiction
 
 -- 5. Докажите, что LessOrEq является предикатом.
 
@@ -63,7 +80,12 @@
   | 0, m => z<=n
   | suc n, suc m => s<=s (LessOrEq n m)
 
-\func LessOrEq-isProp {n m : Nat} : isProp (LessOrEq n m) => {?}
+\func LessOrEq-isProp {n m : Nat} : isProp (LessOrEq n m) => helper
+  \where {
+    \func helper {n m : Nat} (p1 p2 : LessOrEq n m) : p1 = p2 \elim n, m, p1, p2
+      | 0, m, z<=n, z<=n => idp
+      | suc n, suc m, s<=s p1, s<=s p2 => pmap s<=s (helper p1 p2)
+  }
 
 -- 6. Докажте, что ReflClosure LessOrEq не является предикатом, а ReflClosure (\lam x y => T (x < y)) является.
 
@@ -76,13 +98,20 @@
   | refl (x = y)
   | inc (R x y)
 
+-- todo
 \func ReflClosure_<-isProp (n m : Nat) : isProp (ReflClosure (\lam x y => T (x < y)) n m) => {?}
 
-\func ReflClosure_<=-isNotProp (p : \Pi (n m : Nat) -> isProp (ReflClosure LessOrEq n m)) : Empty => {?}
+\func ReflClosure_<=-isNotProp (p : \Pi (n m : Nat) -> isProp (ReflClosure LessOrEq n m)) : Empty =>
+  \let
+    | q => p 0 0
+    | c => q (refl idp) (inc z<=n)
+  \in
+    contradiction
 
 -- 7. Докажите, что если тип A вкладывается в тип B и B является утверждением, то и A является утверждением.
 
-\func sub-isProp {A B : \Type} (f : A -> B) (p : isInj f) (q : isProp B) : isProp A => {?}
+\func sub-isProp {A B : \Type} (f : A -> B) (p : isInj f) (q : isProp B) : isProp A =>
+  \lam a1 a2 => p a1 a2 (q (f a1) (f a2))
 
 -- 8. Докажите, что тип с разрешимым равенством являетя множеством.
 
@@ -96,7 +125,19 @@
   | inl A
   | inr B
 
-\func or-isSet {A B : \Type} (p : isSet A) (q : isSet B) : isSet (Or A B) => {?}
+-- todo
+\func or-isSet {A B : \Type} (p : isSet A) (q : isSet B) : isSet (Or A B) =>
+  \lam ab1 ab2 =>
+      \lam p1 p2 => \case \elim ab1, \elim ab2, \elim p1, \elim p2 \with {
+        | inl a1, inl a2, p1, p2 =>
+          \let
+            | x => p a1 a2 {?}
+          \in
+--            path (\lam i => {?})
+--            retract-isProp {inl a1 = inl a2} {A} {?} {?} {?} (inl a1) (inl a2)
+            {?}
+        | inr b1, inr b2, p1, p2 => {?}
+      }
 
 -- 10. Если B x является множеством, то \Pi (x : A) -> B x тоже является множеством.
 
