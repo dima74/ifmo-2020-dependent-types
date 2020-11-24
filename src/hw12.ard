@@ -1,23 +1,73 @@
-\import lect12
+\import Algebra.Meta
+\import Equiv (Map, Retraction)
+\import Equiv.Univalence
+\import lect11 (funExt)
+\import lect12 \hiding (Equiv)
 \import Utils \hiding (transport,Or,inl,inr)
 
 -- 1. Докажите, что если A : \Prop, то Trunc A эквивалентен A.
 
-\func trunc-prop {A : \Prop} : Trunc A <-> A => {?}
+\func trunc-prop {A : \Prop} : Trunc A <-> A =>
+  (
+    \case __ \with { | trunc a => a },
+    trunc
+  )
 
 -- 2. Докажите следующий закон де Моргана.
 
-\func deMorgan (A B C : \Prop) : (\Sigma A (B `Or` C)) <-> ((\Sigma A B) `Or` (\Sigma A C)) => {?}
+\func deMorgan (A B C : \Prop) : (\Sigma A (B `Or` C)) <-> ((\Sigma A B) `Or` (\Sigma A C)) =>
+  (
+    \case __ \with {
+      | (a, bc) => \case bc \with {
+        | inl b => inl (a, b)
+        | inr c => inr (a, c)
+      }
+    },
+    \case __ \with {
+      | inl (a, b) => (a, inl b)
+      | inr (a, c) => (a, inr c)
+    }
+  )
 
 -- 3. Определите элиминатор для Or через Or-rec, не используя паттерн матчинг на Or.
 
 \func Or-elim {A B : \Prop} (C : Or A B -> \Prop)
               (f : \Pi (x : A) -> C (inl x)) (g : \Pi (y : B) -> C (inr y))
-              (p : A `Or` B) : C p => {?}
+              (p : A `Or` B) : C p =>
+  \let
+    | p2_c => Or-rec {A} {B} {\Sigma (ab : Or A B) (C ab)} (\lam a => (inl a, f a)) (\lam b => (inr b, g b)) p
+    | p2 => p2_c.1
+    | c2 => p2_c.2
+    | p2=p => Path.inProp p2 p
+    | c => transport C p2=p c2
+  \in
+    c
 
+-- нужно использовать унивалентность
 -- 4. Докажите, что тип утверждений является множеством.
 
-\func prop-isSet : isSet \Prop => {?}
+-- univalence
+-- Equiv.equals
+
+\func prop-isSet : isSet \Prop =>
+  \lam p1 p2 =>
+      \lam q1 q2 =>
+          \let
+            | e_p => univalence {p1} {p2}
+            | equal=>equiv => Equiv.f {e_p}
+            | equiv=>equal => Equiv.ret {e_p}
+            | e1 => equal=>equiv q1
+            | e2 => equal=>equiv q2
+            | e1f=e2f => funExt {p1} (\lam _ => p2) (Equiv.f {e1}) (Equiv.f {e2}) (\lam _ => Path.inProp _ _)
+            | e1=e2 => Equiv.equals {p1} {p2} {e1} {e2} e1f=e2f
+            | y => pmap equiv=>equal e1=e2
+            | e1=q1 => Equiv.ret_f {e_p} q1
+            | e2=q2 => Equiv.ret_f {e_p} q2
+          \in
+            equation
+  \where {
+    \open Equiv
+  }
 
 -- 5. Докажите, что функции Prop1-to-Prop2 и Prop2-to-Prop1 взаимно обратны и, как следствие, что Prop1 = Prop2.
 
@@ -31,6 +81,7 @@
 
 \func PropIsCogenerator : isCogenerator \Prop => {?}
 
+-- на подумать
 -- 6b. Тип X называется инъективным, если для любой функции f : A -> X и любой инъекции i : A -> B сущесвует функция l : B -> X такая, что l `o` i = f.
 --     Докажите, что \Prop инъективен.
 
@@ -40,6 +91,7 @@
 
 \func Prop-isInjective : isInjective \Prop => {?}
 
+-- техническая
 -- Можно сделать только одно из упражнений 7a,7b на выбор.
 -- 7a. Докажите, что (Bool = Bool) = Bool.
 
