@@ -1,30 +1,91 @@
+\import Algebra.Meta
+\import Logic.Meta
+\import Paths (transportInv)
 \import Utils
+\import lect11 (funExt)
 \import lect13
 \import lect14
 
 -- 1. Докажите, что add x (add x s) = add x s и add x (add y s) = add y (add x s)
 
 \func add-idemp {S : SetSpec} (x : S.A) (s : S) : add x (add x s) = add x s
-  => {?}
+  => setExt _ _ (\lam y => (
+    \lam y_in_xxs => \case addProp _ _ _ y_in_xxs \with {
+      | byLeft y=x => transport (\lam z => isElem z (add x s)) (sym y=x) (addHead x s)
+      | byRight y_in_xs => y_in_xs
+    },
+    \lam y_in_xs => \case addProp _ _ _ y_in_xs \with {
+      | byLeft y=x => transport (\lam z => isElem z (add x (add x s))) (sym y=x) (addHead x (add x s))
+      | byRight y_in_s => addTail y x _ (addTail y x s y_in_s)
+    }
+  ))
 
 \func add-swap {S : SetSpec} (x y : S.A) (s : S) : add x (add y s) = add y (add x s)
-  => {?}
+  => setExt _ _ (\lam z => (
+    \lam z_in_xys => \case addProp z x _ z_in_xys \with {
+      | byLeft z=x => addTail _ _ _ (transport (\lam q => isElem q (add x s)) (sym z=x) (addHead x s))
+      | byRight z_in_ys => \case addProp z y _ z_in_ys \with {
+        | byLeft z=y => transport (\lam q => isElem q (add y (add x s))) (sym z=y) (addHead y (add x s))
+        | byRight z_in_s => addTail _ _ _ (addTail _ _ _ z_in_s)
+      }
+    },
+    \lam z_in_yxs => \case addProp z y _ z_in_yxs \with {
+      | byLeft z=y => addTail _ _ _ (transport (\lam q => isElem q (add y s)) (sym z=y) (addHead y s))
+      | byRight z_in_xs => \case addProp z x _ z_in_xs \with {
+        | byLeft z=x => transport (\lam q => isElem q (add x (add y s))) (sym z=x) (addHead x (add y s))
+        | byRight z_in_s => addTail _ _ _ (addTail _ _ _ z_in_s)
+      }
+    }
+  ))
 
 -- 2. Докажите, что множество подмножеств является инстансом SetSpec
 
-\func subsets {A : \Set} : SetSpec {A} (A -> \Prop)
-  => {?}
+\func subsets {A : \Set} : SetSpec {A} (A -> \Prop) \cowith
+  | empty => \lam a => Empty
+  | add a s => \lam b => (s b) `Or` (a = b)
+  | isElem a s => s a
+  | setExt s1 s2 f => funExt (\lam _ => \Prop) s1 s2 (\lam a => path (iso {s1 a} {s2 a} (f a).1 (f a).2 (Path.inProp _ __) (Path.inProp _ __)))
+  | emptySpec a => contradiction
+  | addHead a s => byRight idp
+  | addTail y x s => byLeft
+  | addProp y x s => \case __ \with {
+    | byLeft sy => byRight sy
+    | byRight x=y => byLeft (sym x=y)
+  }
 
 -- 3. Докажите, что множество подмножеств является наибольшим инстансом, то есть любой другой вкладывается в него.
 
 \func subsets-largest (S : SetSpec) : \Sigma (f : S -> (S.A -> \Prop)) (isInj f)
-  => {?}
+  => (
+    \lam s a => isElem a s,
+    \lam s1 s2 p => setExt s1 s2 (\lam a => helper (pmap (\lam s => s a) p))
+  )
+  \where {
+    \func helper {A B : \Type} (p : A = B) : \Sigma (A -> B) (B -> A) => (helper1 p, helper2 p)
+    \func helper1 {A B : \Type} (p : A = B) (a : A) : B \elim p | idp => a
+    \func helper2 {A B : \Type} (p : A = B) (b : B) : A \elim p | idp => b
+  }
 
 -- 4. Определите функцию isEmpty для произвольного конечного множества и для ListSet.
 
-\func isEmptySet {S : FinSetSpec} (x : S) : Bool => {?}
+-- любой S равен ListSet, поэтому первая часть выражается через вторую (точно так же как на лекции)
+\func isEmptySet {S : FinSetSpec} (x : S) : Bool => isEmptyListSet (helper (listSet=Set {S}) x)
+  \where {
+    \func helper {A B : \Type} (p : A = B) (b : B) : A \elim p
+      | idp => b
+  }
 
-\func isEmptyListSet {A : \Set} (x : ListSet A) : Bool => {?}
+\func isEmptyListSet {A : \Set} (as : ListSet A) : Bool \elim as
+  | inR nil => true
+  | inR (cons a as) => false
+  | eq nil nil r i => true
+  | eq (cons a as) (cons b bs) r i => false
+  | eq nil (cons b bs) r i => helper {true = false} (\case (r b).2 (here idp) \with {}) @ i
+  | eq (cons a as) nil r i => helper {false = true} (\case (r a).1 (here idp) \with {}) @ i
+  \where {
+    \func helper {A : \Type} (e : Empty) : A
+  }
+
 
 -- 5. Определите функцию union {A : \Set} : S A -> S A -> S A для произвольного S A (удовлетворяющего FinSetSpec) и для ListSet.
 
